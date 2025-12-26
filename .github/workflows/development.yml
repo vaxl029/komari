@@ -21,7 +21,7 @@ jobs:
 
       - name: Clone and build frontend
         run: |
-          git clone https://github.com/komari-monitor/komari-web web
+          git clone --depth 1 --branch vaxl-radix https://github.com/vaxl029/komari-web web
           cd web
           npm install
           npm run build
