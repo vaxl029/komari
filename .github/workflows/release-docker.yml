@@ -4,6 +4,11 @@ on:
   release:
     types: [published]
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Docker Image Version (e.g. 1.0.0)'
+        required: true
+        default: '1.0.0'
 
 permissions:
   contents: read
@@ -31,7 +36,7 @@ jobs:
 
       - name: Clone and build frontend
         run: |
-          git clone https://github.com/komari-monitor/komari-web web
+          git clone --depth 1 --branch vaxl-radix https://github.com/vaxl029/komari-web web
           cd web
           npm install
           npm run build
@@ -56,9 +61,16 @@ jobs:
           CGO_ENABLED: 1
           GIN_MODE: release
         run: |
-          VERSION="${{ github.event.release.tag_name }}"
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            VERSION="${{ inputs.version }}"
+          else
+            VERSION="${{ github.event.release.tag_name }}"
+          fi
+
           VERSION_HASH="${{ github.sha }}"
           LDFLAGS="-s -w -X github.com/komari-monitor/komari/internal/conf.Version=${VERSION} -X github.com/komari-monitor/komari/internal/conf.CommitHash=${VERSION_HASH}"
+
+          echo "Building version: ${VERSION}"
 
           echo "Building for linux/amd64..."
           GOARCH=amd64 CC="zig cc -target x86_64-linux-musl" go build -trimpath -ldflags="$LDFLAGS" -o komari-linux-amd64
@@ -85,7 +97,8 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=raw,value=${{ github.event.release.tag_name }}
+            type=raw,value=${{ github.event.release.tag_name }},enable=${{ github.event_name == 'release' }}
+            type=raw,value=${{ inputs.version }},enable=${{ github.event_name == 'workflow_dispatch' }}
             type=raw,value=latest
 
       - name: Build and push Docker image
